@@ -11,6 +11,14 @@ prediction shape: (16, 1) | dtype: torch.float32
 Training Loss (broken_training_step yang telah diperbaiki): 0.7333
 Training Loss (corrected_training_step): 0.7317
 
+--- Fair Comparison: original_broken_training_step vs corrected_training_step ---
+[original_broken_training_step] mode sebelum: training=True
+[original_broken_training_step] mode sesudah : training=False
+[original_broken_training_step] loss=0.733285
+[corrected_training_step] mode sebelum: training=True
+[corrected_training_step] mode sesudah : training=True
+[corrected_training_step] loss=0.733285
+
 --- Evaluation Step ---
-Evaluation Loss    : 0.6760
-Evaluation Accuracy: 62.50%
+Evaluation Loss    : 0.7301
+Evaluation Accuracy: 56.25%

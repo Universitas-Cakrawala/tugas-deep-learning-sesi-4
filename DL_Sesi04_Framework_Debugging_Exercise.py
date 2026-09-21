@@ -126,7 +126,39 @@ if __name__ == "__main__":
     train_loss_corrected = corrected_training_step(model, optimizer, criterion, X, y)
     print(f"Training Loss (corrected_training_step): {train_loss_corrected:.4f}")
 
-    # 3. Demonstrasi langkah evaluasi
+    # 3. Perbandingan adil antara original_broken_training_step dan corrected_training_step
+    #    Model & optimizer dibuat TERPISAH untuk masing-masing fungsi (tidak dipanggil
+    #    berurutan pada model yang sama), dengan seed yang sama, agar keduanya berangkat
+    #    dari inisialisasi bobot yang identik dan hasilnya bisa dibandingkan secara adil.
+    print("\n--- Fair Comparison: original_broken_training_step vs corrected_training_step ---")
+
+    torch.manual_seed(42)
+    model_broken = nn.Sequential(
+        nn.Linear(2, 8),
+        nn.ReLU(),
+        nn.Linear(8, 1)
+    ).to(device)
+    optimizer_broken = torch.optim.Adam(model_broken.parameters(), lr=1e-3)
+
+    print(f"[original_broken_training_step] mode sebelum: training={model_broken.training}")
+    loss_broken = original_broken_training_step(model_broken, optimizer_broken, criterion, X, y)
+    print(f"[original_broken_training_step] mode sesudah : training={model_broken.training}")
+    print(f"[original_broken_training_step] loss={loss_broken:.6f}")
+
+    torch.manual_seed(42)
+    model_corrected = nn.Sequential(
+        nn.Linear(2, 8),
+        nn.ReLU(),
+        nn.Linear(8, 1)
+    ).to(device)
+    optimizer_corrected = torch.optim.Adam(model_corrected.parameters(), lr=1e-3)
+
+    print(f"[corrected_training_step] mode sebelum: training={model_corrected.training}")
+    loss_corrected = corrected_training_step(model_corrected, optimizer_corrected, criterion, X, y)
+    print(f"[corrected_training_step] mode sesudah : training={model_corrected.training}")
+    print(f"[corrected_training_step] loss={loss_corrected:.6f}")
+
+    # 4. Demonstrasi langkah evaluasi
     print("\n--- Evaluation Step ---")
     X_val = torch.randn(16, 2, device=device)
     y_val = torch.randint(0, 2, (16, 1), device=device).float()
