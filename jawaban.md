@@ -420,10 +420,10 @@ def evaluate_step(model: nn.Module, criterion: nn.Module, X: torch.Tensor, y: to
 
 #### Hasil Pengujian:
 Ketika fungsi ini dijalankan pada data sintetis $X$ berukuran `(16, 2)` dan $y$ berukuran `(16, 1)`:
-- **Evaluation Loss**: `0.6760`
-- **Evaluation Accuracy**: `62.50%` (atau `0.6250`)
+- **Evaluation Loss**: `0.7301`
+- **Evaluation Accuracy**: `56.25%` (atau `0.5625`)
 
-Fungsi berjalan optimal karena  tidak membuat graph gradient baru, tidak melakukan pembaruan bobot, dan menghasilkan nilai loss dan accuracy dalam format float.
+Fungsi berjalan optimal karena tidak membuat graph gradient baru, tidak melakukan pembaruan bobot, dan menghasilkan nilai loss dan accuracy dalam format float.
 
 
 ---
