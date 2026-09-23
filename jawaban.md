@@ -13,7 +13,6 @@
 | 2 | Titanio Yudista | 24120500031 | Anggota |
 | 3 | Suci Fransisca Sisilia R | 24120500008 | Anggota |
 | 4 | Fajar Dwiharjo | 24130500010 | Anggota |
-| 5 | Rafli Ramadhan | 24130500001 | Anggota |
 
 ---
 

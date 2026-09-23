@@ -14,7 +14,6 @@ Repositori ini berisi pengerjaan tugas praktik mata kuliah **Deep Learning (SDA2
 | 2 | **Titanio Yudista** | 24120500031 | Anggota | 25% |
 | 3 | **Suci Fransisca Sisilia R** | 24120500008 | Anggota | 25% |
 | 4 | **Fajar Dwiharjo** | 24130500010 | Anggota | 25% |
-| 5 | **Rafli Ramadhan** | 24130500001 | Anggota | 25% |
 
 ---
 
