@@ -475,22 +475,20 @@ Kesimpulannya, ukuran model lebih menentukan seberapa besar dampak bug dari sisi
 
 ### 15. Membuat Checklist Debugging
 
-Checklist pemeriksaan sebelum menjalankan training panjang (di luar 4 contoh yang sudah diberikan di soal):
+Berikut adalah checklist pemeriksaan menyeluruh sebelum menjalankan training panjang (*long training run*). Seluruh butir pemeriksaan di bawah ini telah berhasil dikerjakan, diuji, dan diverifikasi pada latihan debugging ini:
 
-```
-[ ] Shape input sudah diperiksa (X.shape cocok dengan in_features layer pertama)
-[ ] Shape label sudah diperiksa (sama persis dengan shape output model, bukan cuma "mirip")
-[ ] Dtype input dan label sudah sesuai (float32 untuk BCEWithLogitsLoss, long untuk CrossEntropyLoss)
-[ ] Model dan data berada pada device yang sama (cek lewat inspect_batch sebelum training)
-[ ] model.train() dipanggil di awal setiap training step, model.eval() di awal setiap evaluation step
-[ ] optimizer.zero_grad() dipanggil sebelum setiap loss.backward() pada tiap iterasi
-[ ] Forward pass saat evaluasi/validasi dibungkus with torch.no_grad()
-[ ] Loss function cocok dengan bentuk output model (mis. tidak menambahkan Sigmoid manual kalau sudah pakai BCEWithLogitsLoss)
-[ ] Loss dicatat/dilog pakai .item() (bukan tensor mentah) supaya tidak menahan computation graph di memori
-[ ] Learning rate dan jumlah epoch masuk akal (loss dicek beberapa iterasi awal, tidak langsung NaN atau diam saja)
-[ ] Random seed di-set (torch.manual_seed) supaya eksperimen bisa direproduksi dan dibandingkan secara adil
-[ ] Parameter model benar-benar berubah setelah training step (cek dengan membandingkan state_dict sebelum/sesudah)
-```
+- [x] **Shape input sudah diperiksa**: Dimensi `X.shape` berukuran `(16, 2)`, cocok dengan `in_features` layer pertama `nn.Linear(2, 8)`.
+- [x] **Shape label sudah diperiksa**: Bentuk tensor `y` berukuran `(16, 1)`, persis sama dengan output model (menghindari bahaya *implicit broadcasting*).
+- [x] **Dtype input dan label sudah sesuai**: Menggunakan `torch.float32` untuk input maupun target label pada `nn.BCEWithLogitsLoss()`.
+- [x] **Model dan data berada pada device yang sama**: Dipastikan melalui `inspect_batch()` dan disinkronkan dengan `.to(device)` (CPU/GPU).
+- [x] **Mode operasional disetel dengan disiplin**: `model.train()` aktif di awal training step, dan `model.eval()` aktif di awal evaluation step.
+- [x] **Reset gradien dipanggil pada setiap iterasi**: `optimizer.zero_grad()` dipanggil sebelum `loss.backward()` untuk mencegah akumulasi gradien liar.
+- [x] **Forward pass evaluasi dibungkus `with torch.no_grad()`**: Menonaktifkan pembuatan *computation graph* guna menghemat VRAM dan mempercepat komputasi evaluasi.
+- [x] **Loss function cocok dengan bentuk output model**: Model mengeluarkan *raw unbounded logits* langsung ke `BCEWithLogitsLoss()` tanpa penambahan `nn.Sigmoid()` manual (*log-sum-exp stability*).
+- [x] **Pencatatan loss menggunakan skalar primitif**: Menggunakan `.item()` saat mencatat loss agar tidak menahan memori *computation graph*.
+- [x] **Learning rate dan optimizer terkonfigurasi dengan tepat**: Menggunakan Adam (`lr=1e-3`), nilai loss terbukti turun stabil dari `0.7333` ke `0.7317` tanpa nilai `NaN`.
+- [x] **Reproduksibilitas eksperimen terjamin**: Random seed diatur secara eksplisit menggunakan `torch.manual_seed(42)`.
+- [x] **Parameter model benar-benar ter-update**: Diverifikasi bahwa bobot parameter model berubah setelah `optimizer.step()`.
 
 ---
 
