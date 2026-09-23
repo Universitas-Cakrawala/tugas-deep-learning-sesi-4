@@ -34,19 +34,18 @@ def broken_training_step(model, optimizer, criterion, X, y):
 ```
 
 #### Masalah Utama
-Masalah utama pada fungsi di atas ada pada baris **`model.eval()`**. Karena fungsi ini bertujuan untuk melatih model (*training step*), sehingga mode yang seharusnya diaktifkan adalah **`model.train()`**.
+Masalah utamanya ada pada baris **`model.eval()`**. Fungsi ini dipakai untuk *training step*, jadi mode yang seharusnya digunakan adalah **`model.train()`**.
 
-Dalam PyTorch, `model.eval()` digunakan
-untuk proses evaluasi atau pengujian, bukan untuk melatih model. `model.eval()` tidak menghentikan proses perhitungan gradient, tapi hanya mengubah perilaku beberapa layer tertentu.
+Dalam PyTorch, `model.eval()` dipakai saat evaluasi atau pengujian, bukan saat model sedang dilatih. Yang perlu diperhatikan, `model.eval()` juga tidak menghentikan perhitungan gradient. Fungsi ini hanya mengubah perilaku beberapa layer tertentu.
 
 
 #### Penjelasan :
 1. **Fungsi `model.eval()`**:
-   `model.eval()` berfungsi untuk mengubah mode kerja model ke mode evaluasi/inferensi. Saat perintah ini dipanggil, PyTorch akan menginstruksikan seluruh layer di dalam model untuk menonaktifkan mekanisme yang hanya digunakan saat proses belajar.
-   Perubahan ini tidak menghentikan proses perhitungan gradien, tetapi hanya mengubah cara beberapa layer memproses data.
+   `model.eval()` mengubah mode kerja model menjadi mode evaluasi atau inferensi. Saat perintah ini dipanggil, beberapa layer akan mengubah perilakunya dari mode training ke mode evaluasi.
+   Perubahan ini tidak menghentikan perhitungan gradien. Yang berubah adalah cara beberapa layer memproses data.
 2. **Mode yang Seharusnya Digunakan saat Training**:
    Mode yang wajib digunakan saat fase pelatihan adalah **`model.train()`**.
-   Mode ini memberi informasi kepada PyTorch bahwa model sedang berada dalam tahap training sehingga layer tertentu dapat menjalankan mekanisme pembelajaran seperti biasanya.
+   Mode ini memberi tahu PyTorch bahwa model sedang berada pada tahap training. Dengan begitu, layer tertentu dapat menjalankan perilakunya seperti saat proses pembelajaran.
 3. **Layer yang Perilakunya Berubah antara Mode Training dan Evaluation**:
 Beberapa layer memiliki respons berbeda tergantung mode yang digunakan, di antaranya:
    - **`nn.Dropout`**:
@@ -56,7 +55,7 @@ Beberapa layer memiliki respons berbeda tergantung mode yang digunakan, di antar
      - *Saat Training*: Menghitung nilai rata-rata (*mean*) dan variansi langsung dari batch data yang sedang masuk, sekaligus mencatat perkiraan rata-rata dan variansi global (*running statistics*) untuk dipakai nanti.
      - *Saat Evaluation*: Membekukan perhitungan statistik batch. Layer menggunakan nilai rata-rata dan variansi global yang sudah terkumpul selama masa training.
 4. **Mengapa Masalah ini Memengaruhi Hasil Training**:
-Jika model dilatih menggunakan `model.eval()`, proses training masih dapat berjalan karena `backward()` dan `optimizer.step()` tetap bekerja. Namun, hasil pembelajaran dapat menjadi tidak optimal.
+Jika model dilatih menggunakan `model.eval()`, proses training sebenarnya masih bisa berjalan. `backward()` dan `optimizer.step()` tetap bekerja. Masalahnya, perilaku beberapa layer sudah berubah ke mode evaluasi, sehingga hasil pembelajarannya bisa tidak sesuai yang diharapkan.
 
 Beberapa dampak yang mungkin terjadi:
 
@@ -65,7 +64,7 @@ Beberapa dampak yang mungkin terjadi:
 -   BatchNorm tidak memperbarui nilai statistiknya sehingga performa
     model saat digunakan pada data baru dapat menurun.
 
-Dengan kata lain, kesalahan penggunaan mode ini termasuk *silent bug*, yaitu kesalahan yang tidak selalu menghasilkan error tetapi dapat memengaruhi kualitas model.
+Jadi, kesalahan seperti ini termasuk *silent bug*. Program tetap bisa berjalan tanpa error, tetapi perilaku dan hasil model dapat ikut terpengaruh.
 
 
 ---
@@ -89,12 +88,11 @@ def corrected_training_step(model, optimizer, criterion, X, y):
 ```
 
 #### Alasan Perubahan:
-Perubahan dilakukan dengan mengganti `model.eval()` menjadi
-`model.train()`.
+Perubahannya sebenarnya sederhana: `model.eval()` diganti menjadi `model.train()`.
 
-Dengan menggunakan `model.train()`, model kembali berada pada kondisi yang sesuai untuk proses pembelajaran. Layer seperti Dropout dapat melakukan regularisasi dan BatchNorm dapat memperbarui statistik berdasarkan data training yang masuk.
+Dengan `model.train()`, model kembali berada pada mode yang sesuai untuk pembelajaran. Dropout dapat menjalankan regularisasi, sedangkan BatchNorm dapat memperbarui statistik berdasarkan data training yang masuk.
 
-Walaupun perubahan kode hanya satu baris, hal tersebut berpengaruh terhadap bagaimana model belajar, terutama pada arsitektur yang menggunakan layer seperti Dropout dan BatchNorm.
+Walaupun hanya satu baris yang berubah, efeknya bisa cukup penting, terutama jika arsitektur model menggunakan Dropout atau BatchNorm.
 
 ---
 
@@ -115,16 +113,16 @@ Walaupun perubahan kode hanya satu baris, hal tersebut berpengaruh terhadap baga
 | **Pembaruan Bobot** | `optimizer.step()` tetap dapat memperbarui bobot model jika gradien tersedia. | Tidak ada pembaruan bobot karena nilai gradien tidak dihitung. |
 
 **Kesimpulan:**
-`model.eval()` hanya mengubah perilaku beberapa layer dalam model. Fungsi ini tidak berhubungan langsung dengan penghentian gradient.
+`model.eval()` hanya mengubah perilaku beberapa layer. Fungsi ini tidak digunakan untuk menghentikan perhitungan gradient.
 
-Jika tujuan utama adalah menghemat memori dan menghentikan pencatatan gradien ketika evaluasi, maka proses forward harus dilakukan menggunakan:
+Kalau tujuannya adalah menghemat memori sekaligus menghentikan pencatatan gradien saat evaluasi, proses forward dapat dilakukan menggunakan:
 
 ``` python
 with torch.no_grad(): 
     prediction = model(X) 
 ```
 
-Biasanya, saat evaluasi model, `model.eval()` dan `torch.no_grad()` digunakan secara bersamaan karena keduanya memiliki fungsi yang berbeda.
+Biasanya kedua perintah ini digunakan bersama saat evaluasi karena fungsinya memang berbeda.
 
 ---
 
@@ -141,8 +139,7 @@ Berikut fungsi dari masing-masing perintah dalam satu langkah pelatihan PyTorch:
 | 5 | `optimizer.step()` | Memperbarui nilai bobot dan bias model berdasarkan hasil perhitungan gradien sebelumnya. |
 
 #### Mengapa Urutannya Penting?
-Urutan tersebut tidak dapat dilakukan secara sembarangan karena setiap
-tahap bergantung pada tahap sebelumnya.
+Urutan tersebut tidak bisa dibalik begitu saja karena setiap tahap bergantung pada hasil dari tahap sebelumnya.
 
 1.  Pertama, gradien lama harus dihapus menggunakan `zero_grad()` agar tidak terjadi penumpukan nilai gradien dari iterasi sebelumnya.
 2.  Setelah itu, model menerima input dan menghasilkan prediksi melalui proses *forward pass*.
@@ -150,7 +147,7 @@ tahap bergantung pada tahap sebelumnya.
 4.  Setelah nilai loss diperoleh, PyTorch dapat menghitung gradien melalui `loss.backward()`.
 5.  Terakhir, optimizer menggunakan gradien tersebut untuk memperbarui parameter model melalui `optimizer.step()`.
 
-Jika salah satu tahap dilewati atau urutannya tidak tepat, proses pembelajaran model dapat terganggu.
+Kalau salah satu tahap dilewati atau urutannya tidak tepat, proses pembelajaran model bisa terganggu.
 
 ---
 
@@ -159,7 +156,7 @@ Jika salah satu tahap dilewati atau urutannya tidak tepat, proses pembelajaran m
 #### Apa yang Terjadi:
 Secara bawaan di PyTorch, eksekusi `loss.backward()` memiliki sifat **menjumlahkan (mengakumulasi)** nilai gradien baru ke variabel gradien yang sudah ada pada memori (`param.grad += grad_baru`).
 
-Artinya, jika `optimizer.zero_grad()` tidak dijalankan, nilai gradien dari batch sebelumnya akan tetap tersimpan dan terus terakumulasi pada iterasi berikutnya.
+Artinya, kalau `optimizer.zero_grad()` tidak dijalankan, gradien dari batch sebelumnya masih tersimpan dan akan terus ditambahkan pada iterasi berikutnya.
 
 #### Dampaknya terhadap Proses Training dan Bobot Model:
 Jika `optimizer.zero_grad()` tidak dipanggil:
@@ -169,7 +166,7 @@ semakin besar dan tidak lagi merepresentasikan kondisi batch saat ini.
 3. **Model Gagal Belajar (Divergen)**: Akumulasi gradien dapat membuat nilai loss menjadi tidak stabil. Dalam
 kondisi tertentu, loss dapat meningkat atau menghasilkan nilai `NaN`, sehingga model gagal mencapai konvergensi.
 
-Oleh karena itu, pemanggilan `optimizer.zero_grad()` sebelum setiap proses *backward pass* merupakan langkah penting dalam training PyTorch
+Karena itu, `optimizer.zero_grad()` perlu dipanggil sebelum proses *backward pass* pada setiap iterasi training PyTorch.
 
 ---
 
@@ -196,9 +193,9 @@ Berdasarkan data yang diuji pada script:
 5. **Jumlah output model**: 1 unit nilai logit per sampel.
 
 #### Alasan Shape Label Dibuat `(16, 1)` dan Bukan `(16,)`:
-Output dari layer terakhir model menghasilkan tensor dengan ukuran `(16,1)`. Oleh karena itu, label harus memiliki bentuk yang sama agar dapat dibandingkan secara langsung saat menghitung loss.
+Layer terakhir model menghasilkan tensor berukuran `(16,1)`. Karena itu, label dibuat dengan bentuk yang sama agar keduanya bisa langsung dibandingkan saat menghitung loss.
 
-Selain itu, fungsi:
+Selain itu, fungsi berikut:
 
 ``` python
 nn.BCEWithLogitsLoss() 
@@ -206,7 +203,7 @@ nn.BCEWithLogitsLoss()
 
 mengharuskan ukuran prediksi dan target memiliki dimensi yang sama.
 
-Jika label dibuat dalam bentuk `(16,)`, PyTorch dapat mengalami masalah saat melakukan perhitungan karena dimensi tensor tidak sesuai.
+Kalau label dibuat dalam bentuk `(16,)`, bentuk tensor menjadi berbeda dari output model dan perhitungan loss dapat bermasalah.
 
 ---
 
@@ -218,15 +215,15 @@ y = torch.randint(0, 2, (16, 1)).float()
 ```
 
 #### Alasan Label Diubah Menjadi Float:
-Fungsi `torch.randint()` menghasilkan data bertipe integer (`torch.int64`). Namun, pada kasus klasifikasi biner menggunakan `BCEWithLogitsLoss()`, label harus menggunakan tipe data `float32`.
+`torch.randint()` menghasilkan data bertipe integer (`torch.int64`). Sementara itu, pada klasifikasi biner dengan `BCEWithLogitsLoss()`, target yang digunakan berupa `float32`.
 
-Perintah:
+Perintah ini:
 
 ``` python
 .float() 
 ```
 
-digunakan untuk mengubah tipe data tersebut menjadi `float32`.
+mengubah tipe data tersebut menjadi `float32`.
 
 ### Hubungannya dengan `BCEWithLogitsLoss()`
 
@@ -237,18 +234,18 @@ Berbeda dengan `CrossEntropyLoss()` yang menggunakan label berupa indeks kelas i
 -   kelas 0 → `0.0`
 -   kelas 1 → `1.0`
 
-Jika label masih berupa integer, PyTorch dapat menghasilkan error karena tipe data tidak sesuai.
+Kalau label masih berupa integer, tipe datanya tidak sesuai dengan yang dibutuhkan oleh fungsi tersebut dan PyTorch dapat menghasilkan error.
 
 ---
 
 ### 8. Analisis Device
 
 #### Mengapa Model dan Tensor Input Harus Berada di Device yang Sama?
-PyTorch menjalankan operasi tensor menggunakan perangkat tertentu, seperti CPU atau GPU.
+PyTorch menjalankan operasi tensor pada device tertentu, misalnya CPU atau GPU.
 
-CPU menggunakan memori RAM, sedangkan GPU menggunakan VRAM. Karena keduanya memiliki lokasi penyimpanan berbeda, operasi matematika antar tensor tidak dapat dilakukan jika berada pada device yang berbeda.
+CPU menggunakan RAM, sedangkan GPU menggunakan VRAM. Karena berada pada device yang berbeda, tensor yang digunakan dalam satu operasi perlu ditempatkan pada device yang sama.
 
-Sebagai contoh:
+Contohnya:
 
 -   Model berada di GPU (`cuda:0`)
 -   Input `X` masih berada di CPU
@@ -262,7 +259,7 @@ RuntimeError: Expected all tensors to be on the same device, but found at least 
 ---
 
 #### Cara Memindahkan Model dan Tensor ke Device yang Sesuai:
-Praktik standar yang direkomendasikan adalah mengecek ketersediaan GPU secara dinamis, lalu memindahkan model dan data menggunakan perintah `.to(device)`:
+Cara yang umum digunakan adalah mengecek apakah GPU tersedia, lalu memindahkan model dan data ke device yang dipilih dengan `.to(device)`:
 ```python
 # 1. Tentukan device (gunakan GPU jika tersedia, jika tidak gunakan CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -290,13 +287,13 @@ model = nn.Sequential(
 
 #### Jawaban Analisis:
 1. **Mengapa layer pertama memiliki input size 2?**
-   Karena data masukan ($X$) memiliki 2 kolom fitur. Layer linear pertama harus mencocokkan jumlah fitur tersebut agar perkalian bobot $X \cdot W^T$ dapat dihitung secara valid.
+   Data masukan ($X$) memiliki 2 kolom fitur. Karena itu, layer linear pertama juga menerima 2 fitur agar perkalian bobot $X \cdot W^T$ dapat dilakukan dengan benar.
 2. **Mengapa hidden layer memiliki 8 unit?**
    Jumlah 8 merupakan nilai *hyperparameter* yang ditentukan saat membuat model.
    Delapan neuron memberikan ruang bagi model untuk mempelajari pola yang lebih kompleks dari data input.
    Dengan tambahan fungsi aktivasi ReLU, model dapat mempelajari hubungan yang tidak hanya bersifat linear.
 3. **Mengapa output layer memiliki 1 unit?**
-   Karena model digunakan untuk  **klasifikasi biner** yaitu untuk membedakan dua kelas (dua kelas: 0 atau 1). Karena hanya ada dua kemungkinan kelas (0 dan 1), maka satu nilai output (*logit*) sudah cukup untuk menentukan prediksi.
+   Model ini digunakan untuk **klasifikasi biner**, yaitu membedakan kelas 0 dan 1. Jadi, satu nilai output berupa *logit* sudah cukup untuk menentukan kelas prediksi.
 4. **Apakah model tersebut menggunakan Sigmoid secara eksplisit?**
    **Tidak.** 
    Model berhenti pada:
@@ -307,7 +304,7 @@ model = nn.Sequential(
    tanpa layer `nn.Sigmoid()`. 
    
    
-   Sehingga. output yang dihasilkan adalah nilai mentah (*raw logits*) yang belum diubah menjadi probabilitas 0 sampai 1 atau raw probabilitas
+   Jadi, output yang dihasilkan masih berupa nilai mentah (*raw logits*), belum berupa probabilitas 0 sampai 1.
 
 5. **Mengapa `BCEWithLogitsLoss()` tetap dapat digunakan tanpa menambahkan Sigmoid pada model?**
    Karena fungsi `nn.BCEWithLogitsLoss()` sudah menggabungkan fungsi Sigmoid dan rumus Binary Cross-Entropy ke dalam satu fungsi terpadu di belakang layar.
@@ -319,7 +316,7 @@ model = nn.Sequential(
 
 ### 10. Perbandingan `model.train()` dan `model.eval()`
 
-Dalam PyTorch, `model.train()` dan `model.eval()` digunakan untuk menentukan mode kerja model. Keduanya tidak mengubah struktur model, tetapi mengatur perilaku beberapa layer tertentu selama proses training maupun evaluasi.
+Dalam PyTorch, `model.train()` dan `model.eval()` menentukan mode kerja model. Keduanya tidak mengubah struktur model, tetapi memengaruhi perilaku beberapa layer saat training dan evaluasi.
 
 Berikut tabel perbandingan komprehensif antara `model.train()` dan `model.eval()`:
 
@@ -354,14 +351,14 @@ Tujuannya agar model berada dalam mode evaluasi sekaligus menghemat penggunaan m
 
 ### 11. Mengapa Evaluation Menggunakan `torch.no_grad()`?
 
-Penggunaan blok evaluasi:
+Pada evaluasi, kita dapat menggunakan blok berikut:
 ```python
 with torch.no_grad():
     prediction = model(X)
 ```
 
 #### Alasan Penggunaan:
-Saat melakukan evaluasi atau validasi, tujuan kita hanyalah mengukur performa model (seperti menghitung loss dan akurasi). Kita tidak menjalankan *backpropagation* (`loss.backward()`) dan tidak memperbarui bobot (`optimizer.step()`), sehingga riwayat komputasi untuk gradien tidak perlu dicatat.
+Saat evaluasi atau validasi, kita hanya perlu mengukur performa model, misalnya melalui loss dan akurasi. Kita tidak melakukan *backpropagation* (`loss.backward()`) atau memperbarui bobot dengan `optimizer.step()`. Karena itu, riwayat komputasi untuk gradient tidak perlu disimpan.
 
 #### Dua Manfaat Utama:
 1. **Menghemat Penggunaan Memori (RAM / VRAM GPU):**
@@ -435,7 +432,7 @@ Fungsi berjalan optimal karena  tidak membuat graph gradient baru, tidak melakuk
 
 ### 13. Membandingkan Fungsi Broken dan Corrected
 
-Karena `broken_training_step()` pada script sudah diperbaiki (isinya `model.train()`) dan bug aslinya dipindahkan ke `original_broken_training_step()`, perbandingan berikut menjalankan **kedua versi secara terpisah** — model dan optimizer baru untuk masing-masing, dengan seed dan inisialisasi bobot yang identik — supaya perbandingannya adil.
+Karena `broken_training_step()` pada script sudah diperbaiki dan bug aslinya dipindahkan ke `original_broken_training_step()`, kedua versi dibandingkan **secara terpisah**. Masing-masing menggunakan model dan optimizer baru, dengan seed serta inisialisasi bobot yang sama supaya perbandingannya tetap adil.
 
 **Hasil (fair comparison — model & optimizer terpisah, seed sama):**
 
@@ -453,7 +450,7 @@ Karena `broken_training_step()` pada script sudah diperbaiki (isinya `model.trai
 | 1 — broken | `0.733285` |
 | 2 — corrected | `0.731702` |
 
-Selisih pada perbandingan sekuensial ini (`-0.001584`) **bukan efek dari bug eval/train**, melainkan murni karena bobot model sudah berubah oleh `optimizer.step()` pada panggilan pertama. Ini persis jebakan yang diingatkan di soal: membandingkan loss dua fungsi yang dijalankan berurutan pada model yang sama itu tidak fair, karena kondisi awalnya sudah berbeda.
+Selisih pada perbandingan sekuensial ini (`-0.001584`) **bukan disebabkan oleh bug eval/train**. Bobot model sudah berubah setelah `optimizer.step()` pada panggilan pertama. Jadi, ketika fungsi kedua dijalankan, kondisi awal modelnya sudah berbeda. Itulah sebabnya membandingkan dua fungsi secara berurutan pada model yang sama tidak fair.
 
 **Catatan:**
 
@@ -466,8 +463,7 @@ Selisih pada perbandingan sekuensial ini (`-0.001584`) **bukan efek dari bug eva
 
 ### 14. Mengapa Model Kecil Dapat Tetap Memiliki Masalah?
 
-Ukuran model yang kecil tidak menjamin bahwa model tersebut bebas dari bug.
-Bahkan, model kecil terkadang lebih sulit ditemukan kesalahannya karena program tetap berjalan tanpa menghasilkan error. Beberapa masalah yang tetap bisa terjadi meski model sangat kecil:
+Model yang kecil bukan berarti bebas dari bug. Bahkan, beberapa bug justru sulit terlihat karena program tetap berjalan tanpa menghasilkan error. Beberapa masalah masih bisa muncul meskipun modelnya sederhana:
 
 1. **Mode training/evaluation tertukar (silent bug)** — seperti dibuktikan di soal 13: kalau model kebetulan tidak punya Dropout/BatchNorm, bug ini tidak akan terlihat dari angka loss sama sekali. Begitu model diperbesar dan ditambah Dropout/BatchNorm (hal yang sangat umum), bug yang sama bisa merusak hasil training secara signifikan.
 2. **Shape input tidak sesuai** — kalau `X` punya 3 fitur tapi `nn.Linear(2, 8)` mengharapkan 2, PyTorch akan melempar `RuntimeError` soal ukuran matriks — ini gampang ketahuan karena error langsung muncul, tapi tetap sering terjadi kalau lupa cek shape setelah preprocessing data berubah.
@@ -475,7 +471,7 @@ Bahkan, model kecil terkadang lebih sulit ditemukan kesalahannya karena program 
 4. **Gradient tidak dihapus (`zero_grad()` lupa dipanggil)** — ini juga silent bug: kode tetap jalan tanpa error, tapi gradient terakumulasi dari batch-batch sebelumnya dan training jadi tidak stabil pelan-pelan, bukan langsung crash.
 5. **Learning rate tidak sesuai** — model sekecil apapun bisa gagal belajar (loss stuck atau meledak) kalau learning rate terlalu besar atau kecil; ini murni masalah hyperparameter, tidak ada hubungannya dengan ukuran model.
 
-Kesimpulannya: ukuran model menentukan seberapa *mahal* bug-nya secara komputasi, bukan seberapa *mungkin* bug itu terjadi. Bug logika (silent bug) sama berbahayanya di model kecil maupun besar — bahkan bisa dibilang lebih berbahaya di model kecil karena orang cenderung lebih santai memeriksanya.
+Kesimpulannya, ukuran model lebih menentukan seberapa besar dampak bug dari sisi komputasi, bukan apakah bug tersebut bisa terjadi atau tidak. *Silent bug* tetap bisa muncul pada model kecil maupun besar. Pada model kecil, bug seperti ini malah bisa lebih mudah terlewat karena model terlihat sederhana.
 
 ### 15. Membuat Checklist Debugging
 
@@ -502,13 +498,13 @@ Checklist pemeriksaan sebelum menjalankan training panjang (di luar 4 contoh yan
 
 ### 16. Penjelasan Teknis
 
-Kode yang tidak menghasilkan error belum tentu kode yang benar, karena Python/PyTorch hanya memeriksa apakah operasi-operasinya **valid secara sintaks dan bentuk data** (tensor bisa dikalikan, dimensi cocok, tipe data sesuai) — bukan apakah **logikanya sesuai maksud programmer**. Selama operasi matematikanya sah dijalankan, PyTorch akan tetap mengeksekusinya walau hasilnya secara konsep salah.
+Kode yang tidak menghasilkan error belum tentu berarti kodenya benar. Python/PyTorch dapat memeriksa apakah operasi yang diberikan **valid secara sintaks dan bentuk data**, tetapi tidak selalu bisa mengetahui apakah **logikanya sesuai dengan maksud programmer**. Selama operasinya valid secara matematis, PyTorch tetap akan menjalankannya meskipun konsep yang digunakan ternyata salah.
 
 Contoh nyata dari latihan ini: `broken_training_step()` memanggil `model.eval()` padahal sedang melakukan training. Kode ini berjalan sempurna tanpa satupun error — bahkan `loss.backward()` dan `optimizer.step()` tetap bekerja dan bobot model tetap ter-update. Lebih jauh lagi, dari eksperimen soal 13, angka loss yang dihasilkan bahkan **identik** dengan versi yang sudah benar (karena model ini tidak punya Dropout/BatchNorm). Jadi kalau hanya mengandalkan "kode jalan tanpa error" atau "angkanya kelihatan wajar" sebagai tolok ukur kebenaran, bug ini akan lolos sepenuhnya — padahal secara desain, kode tersebut salah dan berpotensi merusak model lain yang strukturnya sedikit berbeda (yang punya Dropout/BatchNorm).
 
 ### 17. Peran Framework
 
-PyTorch memang mengotomatiskan bagian yang sifatnya mekanis: menghitung turunan (autograd), mengalokasikan/membebaskan memori komputasi, dan menyediakan optimizer siap pakai. Tapi framework tidak tahu apa yang *seharusnya* terjadi secara konseptual — itu tetap tanggung jawab programmer/mahasiswa. Beberapa alasan konkretnya:
+PyTorch memang mengotomatiskan banyak bagian yang sifatnya mekanis, seperti menghitung turunan melalui autograd, mengelola memori komputasi, dan menyediakan optimizer. Tetapi framework tidak mengetahui apa yang **seharusnya** terjadi secara konseptual. Bagian itu tetap menjadi tanggung jawab programmer atau mahasiswa. Contohnya:
 
 - **Forward pass & loss function** — framework hanya menjalankan operasi yang diberikan; kalau arsitektur atau loss function-nya tidak cocok dengan masalahnya (misal loss klasifikasi dipakai untuk regresi), tidak ada peringatan otomatis.
 - **Backward pass** — autograd menghitung gradient dengan benar secara matematis, tapi kalau urutan operasinya salah (misal lupa `zero_grad()`), autograd tetap "patuh" menghitung gradient yang salah secara konsep (terakumulasi).
@@ -516,13 +512,13 @@ PyTorch memang mengotomatiskan bagian yang sifatnya mekanis: menghitung turunan 
 - **Training vs evaluation mode** — ini murni instruksi manual dari programmer (`model.train()` / `model.eval()`); PyTorch tidak bisa menebak kapan seharusnya dipanggil.
 - **Shape & dtype** — PyTorch hanya memvalidasi kompatibilitas teknis, bukan apakah datanya secara semantik benar (misal label 0/1 yang salah urutan kelasnya tetap dianggap valid selama shape & dtype cocok).
 
-Jadi automatic differentiation membebaskan mahasiswa dari menurunkan gradient secara manual, tapi tidak membebaskan dari memahami *apa* yang sedang dihitung dan *kenapa* — karena di situlah letak bug yang paling berbahaya (silent bug), seperti yang dibuktikan langsung di latihan ini.
+Jadi, automatic differentiation memang membebaskan mahasiswa dari menghitung gradient secara manual. Tetapi kita tetap perlu memahami *apa* yang sedang dihitung dan *kenapa*. Di situlah *silent bug* seperti pada latihan ini bisa terlewat.
 
 ---
 
 ## 18. Kesimpulan
 
-Berdasarkan latihan yang telah dilakukan, dapat disimpulkan bahwa kesalahan pada fungsi `broken_training_step()` bukan berasal dari error program, melainkan dari penggunaan mode model yang tidak sesuai.
+Dari latihan ini terlihat bahwa masalah pada `broken_training_step()` bukan berupa error program, tetapi penggunaan mode model yang tidak sesuai.
 
 Penggunaan:
 
@@ -530,7 +526,7 @@ Penggunaan:
 model.eval() 
 ```
 
-pada proses training merupakan kesalahan karena mode tersebut dirancang untuk evaluasi, bukan pembelajaran.
+saat proses training merupakan kesalahan karena mode tersebut digunakan untuk evaluasi, bukan untuk pembelajaran.
 
 Perbaikannya cukup sederhana, yaitu mengganti menjadi:
 
@@ -538,9 +534,9 @@ Perbaikannya cukup sederhana, yaitu mengganti menjadi:
 model.train() 
 ```
 
-agar model kembali bekerja dalam kondisi training.
+agar model kembali bekerja dalam mode training.
 
-Selain itu, latihan ini juga menunjukkan bahwa `model.eval()` tidak sama dengan menghentikan gradient. Fungsi tersebut hanya mengubah beberapa layer tertentu seperti Dropout dan BatchNorm yang mengontrol level berbeda (autograd engine, bukan perilaku layer). Karena itu keduanya sering dipakai bersamaan saat evaluasi, tapi untuk tujuan yang berbeda.
+Latihan ini juga menunjukkan bahwa `model.eval()` bukan berarti menghentikan gradient. Fungsi tersebut mengubah perilaku beberapa layer, seperti Dropout dan BatchNorm, sedangkan `torch.no_grad()` bekerja pada sistem autograd. Karena fungsinya berbeda, keduanya sering digunakan bersamaan saat evaluasi.
 
 Untuk menghentikan pencatatan gradient dan menghemat memori saat evaluasi, PyTorch menyediakan:
 
@@ -548,9 +544,9 @@ Untuk menghentikan pencatatan gradient dan menghemat memori saat evaluasi, PyTor
 torch.no_grad() 
 ```
 
-yang bekerja pada sistem autograd.
+yang bekerja pada sistem autograd dan tidak mengubah mode layer model.
 
-Latihan ini juga memperlihatkan pentingnya melakukan pengecekan terhadap beberapa komponen sebelum training, seperti:
+Latihan ini juga memperlihatkan bahwa beberapa komponen perlu diperiksa sebelum training, seperti:
 
 -   bentuk tensor (*shape*);
 -   tipe data (*dtype*);
